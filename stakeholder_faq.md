@@ -95,14 +95,17 @@ This was possible because we focused ruthlessly on the workflow abstraction rath
 
 ### Can we reuse any existing code or infrastructure?
 
-Yes, strategically:
+Selectively. We're intentionally *not* inheriting the architectural decisions that caused our current problems:
 
-- **Document templates:** Existing letter and notice templates work with the Generate Document module
-- **Mailing infrastructure:** Vigil's Send Correspondence module integrates with our existing mail vendor APIs
-- **Database:** Vigil reads from and writes to the existing violation database—no data migration required
-- **Authentication/authorization:** Leverages existing identity infrastructure
+- **Mailing infrastructure:** Vigil's Send Correspondence module integrates with our existing mail vendor (Cathedral) via their API
+- **Authentication/authorization:** Leverages existing SSO infrastructure through Microsoft Azure
 
-What we *didn't* reuse: the rigid, hardcoded workflow logic that's the source of our current problems. That's the part we replaced, not rebuilt.
+**What we're deliberately leaving behind:**
+
+- **Database schema:** We're building a new schema designed for workflow flexibility, not preserving the existing MySQL structure that bakes in rigid assumptions. We're also moving to a database-per-state architecture for better isolation and scalability.
+- **Document templates:** The current templates are locked in inDesign files on an external XMPie server managed by contractors—inaccessible to both users and developers. Vigil uses a new templating approach that puts control back in-house.
+
+This is a feature, not a limitation. The goal isn't to preserve everything—it's to preserve what works and replace what doesn't.
 
 ---
 
@@ -114,7 +117,7 @@ Vigil is designed for incremental adoption, not a risky big-bang cutover.
 - The current system continues operating for existing partners and workflows
 - New partners onboard directly into Vigil, avoiding legacy configuration entirely
 - High-value manual workarounds migrate to Vigil workflows opportunistically
-- Both systems read/write to the same database—no data synchronization nightmares
+- **Data synchronization:** During the transition period when both systems coexist, we'll need synchronization between the legacy database and Vigil's new schema. This is a known challenge we're planning for—likely a one-way sync from legacy to Vigil for violations that need to be accessible in both systems.
 
 **Long-term:**
 - As workflows migrate to Vigil, the legacy system handles less and less
@@ -151,6 +154,10 @@ Users build workflows; they don't write code. The modules themselves are enginee
 ---
 
 ### Why not microservices? Isn't a monolith an architectural liability?
+
+**The short version for non-technical readers:** Microservices is an architectural pattern that makes sense when you have many independent teams building features that can operate completely separately. We don't have that situation. Our violation processing steps are tightly connected—a single violation touches documents, fines, correspondence, reviews, and payments in sequence. Splitting these into separate services would add complexity without solving any problem we actually have.
+
+**The technical details:**
 
 Microservices solve specific problems: independent scaling, independent deployment, team autonomy across bounded contexts, fault isolation. These benefits come with costs: distributed system complexity, network latency, data consistency challenges, operational overhead.
 
